@@ -1,3 +1,5 @@
+// Temporarily show hidden custom fields
+add_filter('is_protected_meta', '__return_false', 999);
 
 // Hook into WordPress init action with high priority to run before the plugin
 add_action('init', 'register_tribe_post_types_and_taxonomies', 0);
