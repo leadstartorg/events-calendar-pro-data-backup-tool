@@ -1,4 +1,3 @@
-# events-calendar-pro-data-backup-tool
 # WordPress Events Calendar Data Backup Tool
 
 This plugin provides a robust solution for backing up event data from The Events Calendar (and Events Calendar Pro) into custom post meta fields. It's designed to ensure data persistence even if the original plugins are deactivated.
