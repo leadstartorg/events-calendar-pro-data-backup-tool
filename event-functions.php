@@ -1,5 +1,43 @@
 <?php
 
+function ajax_filter_scripts() {
+    // Define conditions where the filter should be available
+    $should_enqueue = (
+        is_post_type_archive('tribe_events') || 
+        is_tax('tribe_events_cat') || 
+        is_tag() ||
+        is_on_custom_post_type_date_archive() ||
+        // Also load on pages that might have the shortcode
+        is_page() || 
+        is_home() || 
+        is_front_page()
+    );
+    
+    if ($should_enqueue) {
+        wp_enqueue_script(
+            'archive-events-filter',
+            get_stylesheet_directory_uri() . '/inc/assets/js/archive-events.js',
+            array('jquery'),
+            filemtime(get_stylesheet_directory() . '/inc/assets/js/archive-events.js'),
+            true
+        );
+        
+        // Localize AJAX data
+        wp_localize_script(
+            'archive-events-filter',
+            'archiveEventsAjax',
+            array(
+                'ajax_url' => admin_url('admin-ajax.php'),
+                'nonce' => wp_create_nonce('taxonomy_filter_nonce'),
+                'current_post_type' => get_current_archive_post_type_by_url(),
+                'is_date_archive' => is_on_custom_post_type_date_archive(),
+                'debug' => defined('WP_DEBUG') && WP_DEBUG
+            )
+        );
+    }
+}
+add_action('wp_enqueue_scripts', 'ajax_filter_scripts');
+
 /**
  * ===============================================================================
  * Event Category and Tag/Keyword Rewrites
