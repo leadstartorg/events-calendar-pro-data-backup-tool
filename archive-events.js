@@ -1,25 +1,22 @@
 /**
- * ORGANIZED MODULAR JAVASCRIPT SOLUTION
- * Clear separation between Calendar-driven and Filter-driven interactions
- * 
- * STRUCTURE:
- * 1. Calendar interactions → update AJAX target, browser URL, taxonomy filters
- * 2. Filter interactions → update AJAX target, browser URL, calendar  
- * 3. URL initialization → set up everything from URL params
+ * COMPLETE ORGANIZED CALENDAR & FILTER SYSTEM WITH DAY-OF-WEEK AND TIME PERIOD FILTERING
+ * Includes all original functions PLUS new advanced filtering capabilities
  */
 
 jQuery(document).ready(function($) {
-    console.log('🚀 Organized Calendar & Filter System Loaded');
+    console.log('🚀 Complete Advanced Organized Calendar & Filter System Loaded');
     
     // ========================================
     // CORE HELPER FUNCTIONS (shared by both calendar and filters)
     // ========================================
     
     /**
-     * Get current filter values from DOM elements
+     * UPDATED: Get current filter values including new filter types
      */
     function getCurrentFilters() {
         const filters = {};
+        
+        // Existing taxonomy filters
         $('.taxonomy-filter-select').each(function() {
             const taxonomyName = $(this).data('taxonomy');
             const selectedValue = $(this).val();
@@ -28,8 +25,113 @@ jQuery(document).ready(function($) {
                 filters[taxonomyName] = Array.isArray(selectedValue) ? selectedValue : [selectedValue];
             }
         });
+        
+        // NEW: Day-of-week filters
+        const selectedDays = [];
+        $('.dayofweek-filter-checkbox:checked:not(:disabled)').each(function() {
+            selectedDays.push(parseInt($(this).val()));
+        });
+        if (selectedDays.length > 0) {
+            filters['dayofweek'] = selectedDays;
+        }
+        
+        // NEW: Time period filters
+        const selectedPeriods = [];
+        $('.timeperiod-filter-checkbox:checked').each(function() {
+            selectedPeriods.push($(this).val());
+        });
+        if (selectedPeriods.length > 0) {
+            filters['timeperiod'] = selectedPeriods;
+        }
+        
         return filters;
     }
+
+    /**
+     * Check if current URL is a specific daily archive (YYYY/MM/DD)
+     */
+    function isSpecificDailyArchive() {
+        const currentPath = window.location.pathname;
+        // Match pattern: /events/YYYY/MM/DD/ (specific day)
+        const dailyPattern = /\/events\/(\d{4})\/(\d{2})\/(\d{2})\/?$/;
+        return dailyPattern.test(currentPath);
+    }
+    
+    /**
+     * Update day-of-week checkbox states based on URL context
+     */
+    function updateDayOfWeekCheckboxStates() {
+        const isDaily = isSpecificDailyArchive();
+        
+        $('.dayofweek-filter-checkbox').each(function() {
+            const $checkbox = $(this);
+            const $label = $checkbox.closest('label, .dayofweek-checkbox');
+            
+            if (isDaily) {
+                // Disable checkboxes for specific daily archives
+                $checkbox.prop('disabled', true);
+                $checkbox.prop('checked', false); // Clear any selections
+                
+                // Add visual styling to indicate disabled state
+                $label.css({
+                    'opacity': '0.5',
+                    'cursor': 'not-allowed',
+                    'color': '#999'
+                });
+                
+                // Add tooltip
+                $label.attr('title', 'Day of week filtering is not applicable when viewing a specific date');
+                
+            } else {
+                // Enable checkboxes for other archive types
+                $checkbox.prop('disabled', false);
+                
+                // Restore normal styling
+                $label.css({
+                    'opacity': '1',
+                    'cursor': 'pointer',
+                    'color': ''
+                });
+                
+                // Remove tooltip
+                $label.removeAttr('title');
+            }
+        });
+        
+        // Add or remove notice
+        if (isDaily) {
+            if ($('.dayofweek-disabled-notice').length === 0) {
+                $('.dayofweek-filter-checkboxes').after(
+                    '<div class="dayofweek-disabled-notice" style="font-size: 12px; color: #666; font-style: italic; margin-top: 5px;">' +
+                    'Day of week filtering is not applicable when viewing a specific date.' +
+                    '</div>'
+                );
+            }
+        } else {
+            $('.dayofweek-disabled-notice').remove();
+        }
+    }
+    
+    // Run on page load
+    updateDayOfWeekCheckboxStates();
+    
+    // MODIFY YOUR EXISTING updateBrowserURL function to include this:
+    // Add this line after window.history.replaceState():
+    // updateDayOfWeekCheckboxStates();
+    
+    // MODIFY YOUR EXISTING getCurrentFilters function:
+    // Change this line:
+    // $('.dayofweek-filter-checkbox:checked').each(function() {
+    // To this:
+    // $('.dayofweek-filter-checkbox:checked:not(:disabled)').each(function() {
+    
+    // MODIFY YOUR EXISTING buildCleanURL function:
+    // In the dayofweek section, add this condition:
+    // if (filters[taxonomyName].length > 0 && !isSpecificDailyArchive()) {
+    
+    // Make these functions available globally for existing code
+    window.updateDayOfWeekCheckboxStates = updateDayOfWeekCheckboxStates;
+    window.isSpecificDailyArchive = isSpecificDailyArchive;
     
     /**
      * Get current calendar context (month/year/day)
@@ -51,7 +153,7 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Build clean URL without duplicates
+     * UPDATED: Build clean URL with new filter types
      */
     function buildCleanURL(basePath, filters) {
         // Handle URLs that already have parameters
@@ -68,36 +170,51 @@ jQuery(document).ready(function($) {
         url.searchParams.delete('keyword'); 
         url.searchParams.delete('tribe_events_cat');
         url.searchParams.delete('post_tag');
+        url.searchParams.delete('dayofweek');
+        url.searchParams.delete('timeperiod');
         
         // Add new filter parameters (pretty format)
         Object.keys(filters).forEach(taxonomyName => {
-            const termIds = filters[taxonomyName];
-            
-            if (termIds.length > 0) {
-                let prettyParam = '';
-                
-                if (taxonomyName === 'tribe_events_cat' || taxonomyName === 'category') {
-                    prettyParam = 'category';
-                } else if (taxonomyName === 'post_tag') {
-                    prettyParam = 'keyword';
+            if (taxonomyName === 'dayofweek') {
+                // ADD this condition:
+                if (filters[taxonomyName].length > 0 && !isSpecificDailyArchive()) {
+                    url.searchParams.set('dayofweek', filters[taxonomyName].join(','));
+                    console.log('📅 Added day-of-week parameter:', filters[taxonomyName].join(','));
                 }
+            } else if (taxonomyName === 'timeperiod') {
+                // NEW: Add time period parameters
+                if (filters[taxonomyName].length > 0) {
+                    url.searchParams.set('timeperiod', filters[taxonomyName].join(','));
+                    console.log('🕐 Added time period parameter:', filters[taxonomyName].join(','));
+                }
+            } else {
+                // Existing taxonomy filters
+                const termIds = filters[taxonomyName];
                 
-                if (prettyParam) {
-                    url.searchParams.set(prettyParam, termIds.join(','));
-                    console.log('📎 Added clean parameter:', prettyParam, '=', termIds.join(','));
+                if (termIds.length > 0) {
+                    let prettyParam = '';
+                    
+                    if (taxonomyName === 'tribe_events_cat' || taxonomyName === 'category') {
+                        prettyParam = 'category';
+                    } else if (taxonomyName === 'post_tag') {
+                        prettyParam = 'keyword';
+                    }
+                    
+                    if (prettyParam) {
+                        url.searchParams.set(prettyParam, termIds.join(','));
+                        console.log('📎 Added clean parameter:', prettyParam, '=', termIds.join(','));
+                    }
                 }
             }
         });
         
         const finalURL = url.toString();
-        console.log('🎯 Built clean URL:', basePath, '→', finalURL);
+        console.log('🎯 Built clean URL with advanced filters:', basePath, '→', finalURL);
         return finalURL;
     }
     
     /**
      * NEW HELPER FUNCTION: Update the calendar HTML display from fetched content
-     * This was the missing piece - calendar HTML wasn't being updated during navigation!
-     * Assumes calendar elements are outside the main AJAX target
      */
     function updateCalendarDisplayFromFetchedContent($data) {
         console.log('🔄 Updating calendar display from fetched HTML...');
@@ -128,6 +245,7 @@ jQuery(document).ready(function($) {
         if (window.history && window.history.replaceState) {
             window.history.replaceState({}, '', newURL);
             console.log('🔗 Browser URL updated:', newURL);
+            updateDayOfWeekCheckboxStates();
         }
     }
     
@@ -200,6 +318,45 @@ jQuery(document).ready(function($) {
         console.log('✅ Filter dropdown options update complete');
     }
     
+    /**
+     * UPDATED: Update filter display state including new filter types
+     */
+    function updateFilterDisplayState(filters) {
+        console.log('🔧 Updating filter display state with advanced filters:', filters);
+        
+        // Update taxonomy dropdowns
+        $('.taxonomy-filter-select').each(function() {
+            const $select = $(this);
+            const taxonomyName = $select.data('taxonomy');
+            
+            if (filters[taxonomyName]) {
+                $select.val(filters[taxonomyName]);
+            } else {
+                $select.val('');
+            }
+        });
+        
+        // NEW: Update day-of-week checkboxes
+        $('.dayofweek-filter-checkbox').prop('checked', false);
+        if (filters['dayofweek']) {
+            filters['dayofweek'].forEach(function(day) {
+                $('.dayofweek-filter-checkbox[value="' + day + '"]').prop('checked', true);
+            });
+            console.log('📅 Updated day-of-week checkboxes:', filters['dayofweek']);
+        }
+        
+        // NEW: Update time period checkboxes
+        $('.timeperiod-filter-checkbox').prop('checked', false);
+        if (filters['timeperiod']) {
+            filters['timeperiod'].forEach(function(period) {
+                $('.timeperiod-filter-checkbox[value="' + period + '"]').prop('checked', true);
+            });
+            console.log('🕐 Updated time period checkboxes:', filters['timeperiod']);
+        }
+        
+        console.log('✅ Advanced filter display state update complete');
+    }
+    
     // ========================================
     // CALENDAR-DRIVEN INTERACTIONS
     // Calendar changes → update AJAX target, browser URL, taxonomy filters
@@ -237,8 +394,7 @@ jQuery(document).ready(function($) {
                 // 1. Update AJAX target
                 $(ajaxTarget).html(newContent);
 
-                // 2. CRITICAL FIX: Update the calendar itself (using the new helper function)
-                // This was the missing piece - calendar HTML wasn't being updated!
+                // 2. CRITICAL FIX: Update the calendar itself
                 updateCalendarDisplayFromFetchedContent($data);
                 
                 // 3. Update browser URL
@@ -330,17 +486,22 @@ jQuery(document).ready(function($) {
     }
     
     // ========================================
-    // FILTER-DRIVEN INTERACTIONS  
+    // UPDATED FILTER-DRIVEN INTERACTIONS  
     // Filter changes → update AJAX target, browser URL, calendar
     // ========================================
     
     /**
-     * MASTER FUNCTION: Handle filter changes
-     * Called when taxonomy filter dropdowns change
+     * UPDATED: Handle filter changes including new filter types
      */
     function handleFilterChange(newFilters, triggerSource = 'unknown') {
-        console.log(`=== FILTER CHANGE (${triggerSource}) ===`);
-        console.log('New filters:', newFilters);
+        // Critical safety check
+        if (typeof archiveEventsAjax === 'undefined') {
+            console.error('❌ FATAL: archiveEventsAjax not defined - AJAX filtering will not work');
+            return;
+        }
+
+        console.log(`=== ADVANCED FILTER CHANGE (${triggerSource}) ===`);
+        console.log('New advanced filters:', newFilters);
         
         const container = $('.taxonomy-filter-container').first();
         const postType = container.data('post-type') || 'tribe_events';
@@ -350,19 +511,36 @@ jQuery(document).ready(function($) {
         $('#filter-loading').show();
         $(ajaxTarget).addClass('loading');
         
+        // NEW: Prepare advanced AJAX data
+        const ajaxData = {
+            action: 'filter_posts_by_taxonomy',
+            current_page_url: window.location.pathname,
+            post_type: postType,
+            taxonomy_filters: {},
+            nonce: archiveEventsAjax.nonce
+        };
+        
+        // Separate different filter types
+        Object.keys(newFilters).forEach(filterKey => {
+            if (filterKey === 'dayofweek') {
+                ajaxData.dayofweek_filters = newFilters[filterKey];
+            } else if (filterKey === 'timeperiod') {
+                ajaxData.timeperiod_filters = newFilters[filterKey];
+            } else {
+                // Regular taxonomy filters
+                ajaxData.taxonomy_filters[filterKey] = newFilters[filterKey];
+            }
+        });
+        
+        console.log('📤 Sending advanced AJAX data:', ajaxData);
+        
         // Send AJAX request
         $.ajax({
             url: archiveEventsAjax.ajax_url,
             type: 'POST',
-            data: {
-                action: 'filter_posts_by_taxonomy',
-                current_page_url: window.location.pathname,
-                post_type: postType,
-                taxonomy_filters: newFilters,
-                nonce: archiveEventsAjax.nonce
-            },
+            data: ajaxData,
             success: function(response) {
-                console.log(`=== FILTER AJAX SUCCESS (${triggerSource}) ===`);
+                console.log(`=== ADVANCED FILTER AJAX SUCCESS (${triggerSource}) ===`);
                 
                 if (response.success) {
                     // 1. Update AJAX target
@@ -375,13 +553,13 @@ jQuery(document).ready(function($) {
                     // 3. Update calendar with filtered results
                     updateCalendarWithFilters(newFilters);
                     
-                    console.log(`✅ Filter change complete (${triggerSource})`);
+                    console.log(`✅ Advanced filter change complete (${triggerSource})`);
                 } else {
                     console.error('AJAX returned error:', response.data);
                 }
             },
             error: function(xhr, status, error) {
-                console.error(`=== FILTER AJAX ERROR (${triggerSource}) ===`);
+                console.error(`=== ADVANCED FILTER AJAX ERROR (${triggerSource}) ===`);
                 console.error('Status:', status, 'Error:', error);
             },
             complete: function() {
@@ -392,8 +570,7 @@ jQuery(document).ready(function($) {
     }
     
     /**
-     * Update calendar display with filtered results - IMPROVED VERSION
-     * Now uses the same pattern as calendar navigation
+     * UPDATED: Update calendar with advanced filters
      */
     function updateCalendarWithFilters(filters) {
         if (!$('#wp-calendar, .wp-calendar-nav').length) {
@@ -401,7 +578,7 @@ jQuery(document).ready(function($) {
             return;
         }
         
-        console.log('📅 Updating calendar with filters:', filters);
+        console.log('📅 Updating calendar with advanced filters:', filters);
         
         const calendarContext = getCurrentCalendarContext();
         
@@ -426,67 +603,20 @@ jQuery(document).ready(function($) {
             .done(function(data) {
                 const $data = $(data);
                 
-                // UPDATED: Use the same calendar update method as navigation
+                // Use the same calendar update method as navigation
                 updateCalendarDisplayFromFetchedContent($data);
-                console.log('✅ Calendar updated successfully with filtered results');
+                console.log('✅ Calendar updated successfully with advanced filtered results');
             })
             .fail(function(xhr, status, error) {
-                console.log('❌ Calendar update failed:', status, error);
+                console.log('❌ Advanced calendar update failed:', status, error);
             });
     }
-    
-    /* OLD VERSION THAT DIDN'T UPDATE CALENDAR HTML PROPERLY - COMMENTED OUT
-    function updateCalendarWithFilters(filters) {
-        if (!$('#wp-calendar, .wp-calendar-nav').length) {
-            console.log('📅 No calendar found to update');
-            return;
-        }
-        
-        console.log('📅 Updating calendar with filters:', filters);
-        
-        const calendarContext = getCurrentCalendarContext();
-        
-        // Build URL for calendar update
-        let calendarURL = window.location.pathname;
-        
-        if (calendarContext.hasDropdowns && calendarContext.year) {
-            const pathParts = window.location.pathname.split('/').filter(part => part);
-            
-            if (pathParts.length >= 1 && pathParts[0] === 'events') {
-                calendarURL = '/events/' + calendarContext.year + '/';
-                if (calendarContext.month) {
-                    calendarURL += calendarContext.month.padStart(2, '0') + '/';
-                }
-            }
-        }
-        
-        const cleanCalendarURL = buildCleanURL(calendarURL, filters);
-        
-        // Fetch updated calendar
-        $.get(cleanCalendarURL)
-            .done(function(data) {
-                const $data = $(data);
-                const newCalendar = $data.find('#wp-calendar, .wp-calendar-nav').first();
-                
-                if (newCalendar.length) {
-                    $('#wp-calendar, .wp-calendar-nav').first().replaceWith(newCalendar);
-                    console.log('✅ Calendar updated successfully with filtered results');
-                    
-                    $('#wp-calendar').addClass('table table-striped');
-                } else {
-                    console.log('⚠️ No calendar found in fetched data');
-                }
-            })
-            .fail(function(xhr, status, error) {
-                console.log('❌ Calendar update failed:', status, error);
-            });
-    }
-    */
     
     /**
-     * Taxonomy filter dropdown changes
+     * UPDATED: Initialize filter handlers including new filter types
      */
     function initFilterHandlers() {
+        // Existing taxonomy filter dropdown changes
         $(document).on('change', '.taxonomy-filter-select', function(e) {
             // Skip if this is a display update (prevents loops)
             if (e.namespace === 'display') {
@@ -496,10 +626,24 @@ jQuery(document).ready(function($) {
             const newFilters = getCurrentFilters();
             handleFilterChange(newFilters, 'filter dropdown');
         });
+        
+        // NEW: Day-of-week checkbox changes
+        $(document).on('change', '.dayofweek-filter-checkbox', function(e) {
+            console.log('📅 Day-of-week checkbox changed');
+            const newFilters = getCurrentFilters();
+            handleFilterChange(newFilters, 'day-of-week checkbox');
+        });
+        
+        // NEW: Time period checkbox changes
+        $(document).on('change', '.timeperiod-filter-checkbox', function(e) {
+            console.log('🕐 Time period checkbox changed');
+            const newFilters = getCurrentFilters();
+            handleFilterChange(newFilters, 'time period checkbox');
+        });
     }
     
     /**
-     * Clear filters button
+     * UPDATED: Clear filters handler including new filter types
      */
     function initClearFiltersHandler() {
         $(document).on('click', '.clear-filters', function() {
@@ -508,21 +652,27 @@ jQuery(document).ready(function($) {
             // Reset all dropdowns
             container.find('.taxonomy-filter-select').val('');
             
+            // NEW: Reset day-of-week checkboxes
+            container.find('.dayofweek-filter-checkbox').prop('checked', false);
+            
+            // NEW: Reset time period checkboxes
+            container.find('.timeperiod-filter-checkbox').prop('checked', false);
+            
             // Trigger filter change with empty filters
             handleFilterChange({}, 'clear filters');
         });
     }
     
     // ========================================
-    // URL INITIALIZATION
+    // UPDATED URL INITIALIZATION
     // Direct URL paste → set up taxonomy filters, calendar, and AJAX target
     // ========================================
     
     /**
-     * Initialize everything from URL parameters on page load
+     * UPDATED: Initialize everything from URL parameters including new filter types
      */
     function initializeFromURL() {
-        console.log('🔧 Initializing from URL...');
+        console.log('🔧 Initializing advanced filters from URL...');
         
         const urlParams = new URLSearchParams(window.location.search);
         let hasFilters = false;
@@ -556,51 +706,76 @@ jQuery(document).ready(function($) {
             }
         });
         
-        // 2. Set up calendar from URL
+        // 2. NEW: Set up day-of-week filters from URL
+        const dayofweekParam = urlParams.get('dayofweek');
+        if (dayofweekParam) {
+            const days = dayofweekParam.split(',').map(d => parseInt(d));
+            days.forEach(function(day) {
+                $('.dayofweek-filter-checkbox[value="' + day + '"]').prop('checked', true);
+            });
+            detectedFilters['dayofweek'] = days;
+            hasFilters = true;
+            console.log('🔧 Set day-of-week filter from URL:', days);
+        }
+        
+        // 3. NEW: Set up time period filters from URL
+        const timeperiodParam = urlParams.get('timeperiod');
+        if (timeperiodParam) {
+            const periods = timeperiodParam.split(',');
+            periods.forEach(function(period) {
+                $('.timeperiod-filter-checkbox[value="' + period + '"]').prop('checked', true);
+            });
+            detectedFilters['timeperiod'] = periods;
+            hasFilters = true;
+            console.log('🔧 Set time period filter from URL:', periods);
+        }
+        
+        // 4. Set up calendar from URL
         updateCalendarDropdownsFromURL(window.location.href);
         
-        // 3. If we have filters, update calendar to show filtered results
+        // 5. If we have filters, update calendar to show filtered results
         if (hasFilters) {
-            console.log('🔧 URL has filters, updating calendar with filtered results...');
+            console.log('🔧 URL has advanced filters, updating calendar with filtered results...');
             updateCalendarWithFilters(detectedFilters);
         }
         
-        console.log('✅ URL initialization complete');
+        console.log('✅ Advanced URL initialization complete');
         return hasFilters;
     }
+
     
     // ========================================
     // SYSTEM INITIALIZATION
     // ========================================
     
     function initializeSystem() {
-        console.log('🚀 Initializing organized filter & calendar system...');
+        console.log('🚀 Initializing complete advanced filter & calendar system...');
         
         // Initialize calendar interactions
         initCalendarDropdownHandlers();
         initCalendarLinkHandlers(); 
         initTodayButtonHandler();
         
-        // Initialize filter interactions
+        // Initialize advanced filter interactions
         initFilterHandlers();
         initClearFiltersHandler();
         
-        // Initialize from URL
+        // Initialize from URL with advanced filters
         initializeFromURL();
         
-        // Add system status indicator
+        // Add advanced system status indicator
         if ($('.taxonomy-filter-container, .calendar-controls').length) {
             $('.taxonomy-filter-container, .calendar-controls').first().prepend(
-                '<div class="system-status" style="background: #e8f5e8; padding: 5px; margin-bottom: 10px; font-size: 11px; border-radius: 3px;">' +
-                '✅ <strong>Organized System Active</strong> - Clear separation: Calendar ↔ Filters ↔ URL' +
+                '<div class="advanced-system-status" style="background: #e8f5e8; padding: 5px; margin-bottom: 10px; font-size: 11px; border-radius: 3px;">' +
+                '✅ <strong>Complete Advanced System Active</strong> - Calendar ↔ Taxonomy ↔ Day-of-Week ↔ Time Period ↔ URL' +
                 '</div>'
             );
         }
         
-        console.log('✅ Organized system initialization complete');
+        console.log('✅ Complete advanced system initialization complete');
         
         // Expose helper functions for debugging
-        window.FilterCalendarSystem = {
+        window.CompleteFilterCalendarSystem = {
             // Core helpers
             getCurrentFilters: getCurrentFilters,
             getCurrentCalendarContext: getCurrentCalendarContext,
@@ -613,302 +788,60 @@ jQuery(document).ready(function($) {
             // Filter-driven functions  
             handleFilterChange: handleFilterChange,
             updateCalendarWithFilters: updateCalendarWithFilters,
+            updateFilterDisplayState: updateFilterDisplayState,
             
             // URL initialization
             initializeFromURL: initializeFromURL
         };
     }
     
-    // Start the organized system
+    // Start the complete system
     initializeSystem();
     
-    /* ========================================
-     * OLD NON-ORGANIZED CODE - COMMENTED OUT
-     * ========================================
-     
-    // Old mixed responsibility functions - replaced by organized structure above
+    /**
+     * DEBUGGING HELPERS
+     */
     
-    // function handleTaxonomyFilterChange() {
-    //     $(document).on('change', '.taxonomy-filter-select', function(e) {
-    //         // Skip if this is a display update (prevents loops)
-    //         if (e.namespace === 'display') {
-    //             return;
-    //         }
-    //         
-    //         console.log('=== FILTER CHANGE DETECTED ===');
-    //         
-    //         const container = $(this).closest('.taxonomy-filter-container');
-    //         const postType = container.data('post-type');
-    //         const ajaxTarget = container.data('ajax-target');
-    //         
-    //         // Get current filter state
-    //         const selectedFilters = getCurrentFilters();
-    //         console.log('Current filters:', selectedFilters);
-    //         
-    //         // Show loading
-    //         $('#filter-loading').show();
-    //         if ($(ajaxTarget).length) {
-    //             $(ajaxTarget).addClass('loading');
-    //         }
-    //         
-    //         // Send AJAX request
-    //         $.ajax({
-    //             url: archiveEventsAjax.ajax_url,
-    //             type: 'POST',
-    //             data: {
-    //                 action: 'filter_posts_by_taxonomy',
-    //                 current_page_url: window.location.pathname,
-    //                 post_type: postType,
-    //                 taxonomy_filters: selectedFilters,
-    //                 nonce: archiveEventsAjax.nonce
-    //             },
-    //             success: function(response) {
-    //                 console.log('=== AJAX SUCCESS ===');
-    //                 
-    //                 if (response.success) {
-    //                     // Update target content
-    //                     if ($(ajaxTarget).length) {
-    //                         $(ajaxTarget).html(response.data.html);
-    //                     }
-    //                     
-    //                     // CRITICAL: Synchronize all components
-    //                     synchronizeAllComponents(selectedFilters, true);
-    //                     
-    //                 } else {
-    //                     console.error('AJAX returned error:', response.data);
-    //                 }
-    //             },
-    //             error: function(xhr, status, error) {
-    //                 console.error('=== AJAX ERROR ===');
-    //                 console.error('Status:', status, 'Error:', error);
-    //             },
-    //             complete: function() {
-    //                 $('#filter-loading').hide();
-    //                 if ($(ajaxTarget).length) {
-    //                     $(ajaxTarget).removeClass('loading');
-    //                 }
-    //             }
-    //         });
-    //     });
-    // }
+    // Debug current filter state
+    $(document).on('click', '.debug-filters', function() {
+        const currentFilters = getCurrentFilters();
+        console.log('🔍 Current Complete Advanced Filters:', currentFilters);
+        
+        const debugInfo = {
+            'Current Filters': currentFilters,
+            'URL Parameters': Object.fromEntries(new URLSearchParams(window.location.search)),
+            'Archive Context': window.location.pathname
+        };
+        
+        alert('Complete Advanced Filter Debug Info (check console for details):\n' + JSON.stringify(debugInfo, null, 2));
+    });
     
-    // function handleCalendarDropdownChange() {
-    //     $(document).on('change', '#calendar_month, #calendar_year', function(e) {
-    //         console.log('=== CALENDAR DROPDOWN CHANGE ===');
-    //         
-    //         const calendarContext = getCurrentCalendarContext();
-    //         const currentFilters = getCurrentFilters();
-    //         const ajaxTarget = $('.calendar-controls').data('ajax-target') || '#primary';
-    //         
-    //         // Build new URL with calendar date
-    //         let newURL = window.location.pathname;
-    //         
-    //         // Update path with new month/year
-    //         const pathParts = newURL.split('/').filter(part => part);
-    //         if (pathParts.length >= 1 && pathParts[0] === 'events') {
-    //             newURL = '/events/' + calendarContext.year + '/';
-    //             if (calendarContext.month) {
-    //                 newURL += calendarContext.month.padStart(2, '0') + '/';
-    //             }
-    //         }
-    //         
-    //         // Add current filters
-    //         const finalURL = buildCleanURL(newURL, currentFilters);
-    //         
-    //         console.log('Calendar navigation to:', finalURL);
-    //         
-    //         // Load new content
-    //         $(ajaxTarget).addClass('calendar-loading');
-    //         
-    //         $.get(finalURL)
-    //             .done(function(data) {
-    //                 const $data = $(data);
-    //                 const newContent = $data.find(ajaxTarget).html();
-    //                 
-    //                 // Update target content
-    //                 $(ajaxTarget).html(newContent);
-    //                 
-    //                 // Update browser URL
-    //                 updateBrowserURL(finalURL);
-    //                 
-    //                 // CRITICAL FIX: Pass the full $data to synchronization  
-    //                 // This allows filter dropdown options to be updated for the new month
-    //                 synchronizeAllComponents(currentFilters, false, $data);
-    //                 
-    //                 console.log('✅ Calendar navigation complete with filter options updated');
-    //             })
-    //             .fail(function(xhr, status, error) {
-    //                 console.log('❌ Calendar navigation failed:', status, error);
-    //                 window.location.href = finalURL; // Fallback to page reload
-    //             })
-    //             .always(function() {
-    //                 $(ajaxTarget).removeClass('calendar-loading');
-    //             });
-    //     });
-    // }
-    
-    // function handleCalendarLinkClicks() {
-    //     $(document).on('click', '#wp-calendar a, #calendar-wrapper a, .wp-calendar-nav a', function(e) {
-    //         const href = $(this).attr('href');
-    //         
-    //         // Check if it's a date archive URL
-    //         if (href && href.match(/\/(?:[a-z-]+\/)?(\d{4})\/(\d{2})(\/\d{2})?\/?$/)) {
-    //             e.preventDefault();
-    //             
-    //             console.log('=== CALENDAR LINK CLICKED ===', href);
-    //             
-    //             const currentFilters = getCurrentFilters();
-    //             const ajaxTarget = $('.calendar-controls').data('ajax-target') || '#primary';
-    //             
-    //             // CRITICAL FIX: Extract clean path without ANY parameters
-    //             // This prevents the duplicate parameter issue
-    //             let cleanPath = href;
-    //             if (href.includes('?')) {
-    //                 cleanPath = href.split('?')[0];
-    //                 console.log('🧹 Cleaned calendar link path:', href, '→', cleanPath);
-    //             }
-    //             
-    //             // Ensure path ends with slash for consistency
-    //             if (!cleanPath.endsWith('/')) {
-    //                 cleanPath += '/';
-    //             }
-    //             
-    //             // Build final URL with current filters (guaranteed no duplicates)
-    //             const finalURL = buildCleanURL(cleanPath, currentFilters);
-    //             
-    //             console.log('📍 Calendar link navigation:', {
-    //                 originalHref: href,
-    //                 cleanPath: cleanPath,
-    //                 currentFilters: currentFilters,
-    //                 finalURL: finalURL
-    //             });
-    //             
-    //             // Load new content
-    //             $(ajaxTarget).addClass('calendar-loading');
-    //             
-    //             $.get(finalURL)
-    //                 .done(function(data) {
-    //                     const $data = $(data);
-    //                     const newContent = $data.find(ajaxTarget).html();
-    //                     
-    //                     // Update target content
-    //                     $(ajaxTarget).html(newContent);
-    //                     
-    //                     // Update browser URL
-    //                     updateBrowserURL(finalURL);
-    //                     
-    //                     // Update calendar dropdowns to reflect new date
-    //                     updateCalendarDropdownsFromURL(finalURL);
-    //                     
-    //                     // CRITICAL FIX: Pass the full $data to synchronization
-    //                     // This allows filter dropdown options to be updated
-    //                     synchronizeAllComponents(currentFilters, false, $data);
-    //                     
-    //                     console.log('✅ Calendar link navigation complete with filter options updated');
-    //                 })
-    //                 .fail(function(xhr, status, error) {
-    //                     console.log('❌ Calendar link navigation failed:', status, error);
-    //                     window.location.href = finalURL;
-    //                 })
-    //                 .always(function() {
-    //                     $(ajaxTarget).removeClass('calendar-loading');
-    //                 });
-    //         }
-    //     });
-    // }
-    
-    // function handleTodayButtonClick() {
-    //     $(document).on('click', '#calendar_today', function(e) {
-    //         console.log('=== TODAY BUTTON CLICKED ===');
-    //         
-    //         const today = new Date();
-    //         const currentMonth = String(today.getMonth() + 1).padStart(2, '0');
-    //         const currentYear = today.getFullYear();
-    //         const currentDay = String(today.getDate()).padStart(2, '0');
-    //         
-    //         // Update calendar dropdowns
-    //         $('#calendar_month').val(currentMonth);
-    //         $('#calendar_year').val(currentYear);
-    //         
-    //         // Trigger dropdown change handler
-    //         $('#calendar_month').trigger('change');
-    //     });
-    // }
-    
-    // function handleClearFilters() {
-    //     $(document).on('click', '.clear-filters', function() {
-    //         console.log('=== CLEARING FILTERS ===');
-    //         
-    //         const container = $(this).closest('.taxonomy-filter-container');
-    //         
-    //         // Reset all dropdowns
-    //         container.find('.taxonomy-filter-select').val('');
-    //         
-    //         // Trigger change on first dropdown to update everything
-    //         container.find('.taxonomy-filter-select').first().trigger('change');
-    //     });
-    // }
-    
-    // function synchronizeAllComponents(filters, updateURL = true, $newContent = null) {
-    //     console.log('🔄 Synchronizing all components...');
-    //     
-    //     // Update calendar with filtered results
-    //     updateCalendarWithFilters(filters);
-    //     
-    //     // UPDATED: If we have new content, update filter dropdown options first
-    //     if ($newContent && $newContent.length) {
-    //         updateFilterDropdownOptions($newContent, true);
-    //     } else {
-    //         // Fallback: just update display state
-    //         updateFilterDisplayState(filters);
-    //     }
-    //     
-    //     // Update browser URL if requested
-    //     if (updateURL) {
-    //         const cleanURL = buildCleanURL(window.location.pathname, filters);
-    //         updateBrowserURL(cleanURL);
-    //     }
-    //     
-    //     console.log('✅ Component synchronization complete');
-    // }
-    
-    */
+    // Add debug button if needed
+    if (window.location.search.includes('debug=1')) {
+        $('body').append('<button class="debug-filters" style="position:fixed;top:10px;right:10px;z-index:9999;background:#007cba;color:white;border:none;padding:10px;cursor:pointer;">Debug Complete Advanced Filters</button>');
+    }
 });
 
 /**
- * ORGANIZED STRUCTURE EXPLANATION:
+ * COMPLETE INTERACTION FLOW DOCUMENTATION:
  * 
  * 📋 CALENDAR-DRIVEN INTERACTIONS:
- * When user interacts with calendar (month/year dropdowns, monthly navigation, day links):
- * 1. handleCalendarChange() - Master function for all calendar interactions
- * 2. Updates AJAX target with new content for that date
- * 3. Updates browser URL with new date + current filters  
- * 4. Updates taxonomy filter OPTIONS to show only categories available for that date
- * 
- * 📋 FILTER-DRIVEN INTERACTIONS:
- * When user interacts with taxonomy filters:
- * 1. handleFilterChange() - Master function for all filter interactions
- * 2. Updates AJAX target with filtered content
- * 3. Updates browser URL with new filters + current date
- * 4. Updates calendar to highlight only days with filtered events
- * 
- * 📋 URL INITIALIZATION:
- * When user pastes URL directly in browser:
- * 1. initializeFromURL() - Parses URL parameters
- * 2. Sets up taxonomy filter selections from URL params
- * 3. Sets up calendar month/year from URL path
- * 4. Updates calendar to show filtered results if filters detected
- * 
- * ✅ BENEFITS OF THIS ORGANIZATION:
- * - Clear separation of concerns
- * - No duplicate logic between calendar and filter interactions
- * - Single master functions handle each interaction type
- * - Easy to debug and maintain
- * - URL initialization works perfectly with all components
- * - Clean flow: interaction → master function → updates 3 areas
- * 
- * 🔄 INTERACTION FLOW:
  * Calendar Change → handleCalendarChange() → Update: AJAX target, URL, filters
- * Filter Change → handleFilterChange() → Update: AJAX target, URL, calendar  
- * URL Paste → initializeFromURL() → Setup: filters, calendar, sync everything
+ * 
+ * 📋 ADVANCED FILTER-DRIVEN INTERACTIONS:
+ * Filter Change → handleFilterChange() → Process: taxonomy + day-of-week + time period → Update: AJAX target, URL, calendar
+ * 
+ * 📋 ADVANCED URL INITIALIZATION:
+ * URL Paste → initializeFromURL() → Parse: taxonomy + day-of-week + time period → Setup: filters, calendar, sync
+ * 
+ * ✅ COMPLETE BENEFITS:
+ * - All original calendar functionality preserved
+ * - Day-of-week filtering with checkboxes (Sunday-Saturday)
+ * - Time period filtering (All Day, Morning, Afternoon, Evening, Night)
+ * - Only available on date archives for events (not taxonomy archives)
+ * - Clean URL parameter handling (dayofweek=1,2,3 & timeperiod=morning,evening)
+ * - Seamless integration with existing calendar and taxonomy systems
+ * - Proper AJAX communication with all filter types
+ * - URL initialization handles all filter types consistently
+ * - Complete function library with no missing dependencies
  */
