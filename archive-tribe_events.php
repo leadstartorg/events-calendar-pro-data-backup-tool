@@ -139,6 +139,8 @@ if ($year) {
     } else {
         echo "No custom post type date archive detected";
     } ?>
+    <?php //echo do_shortcode('[debug_missing_filtering]'); ?>
+    <?php echo do_shortcode('[quick_time_debug]'); ?>
     <?php echo do_shortcode('[debug_wp_state]'); ?>
 <?php //echo do_shortcode('[debug_events_db]'); ?>
     <div class="post-type-archive-tribe_events">
