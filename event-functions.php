@@ -557,6 +557,9 @@ function add_events_query_vars($vars) {
     $vars[] = 'address';
     $vars[] = 'start_date';
     $vars[] = 'end_date';
+    $vars[] = 'search';
+    $vars[] = 'featured';
+    $vars[] = 'virtual';
     return $vars;
 }
 add_filter('query_vars', 'add_events_query_vars');
